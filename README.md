@@ -10,11 +10,11 @@ This project uses bulk RNA-seq data to analyze differential gene expression in m
 # Data Preparation:
 This project uses **GSE146639** and **GSE174367**, which can be downloaded from the GEO database at 
 1. https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE146639:
-   Download the GSE146639_RAW.tar file and (optionally) the Series Matrix file (a preprocessed metadata version is available within the repository. Note that you will have to extract the bulk RNA samples from zipped folders within GSE146639_RAW.tar after download.
+   Download the GSE146639_RAW.tar file and (optionally) the Series Matrix file (a preprocessed metadata version is available within the repository). Note that you will have to extract the bulk RNA samples from zipped folders within GSE146639_RAW.tar after download.
    - After selecting and unzipping all the bulk RNA samples, save to folder in your directory named 'bulk'.
    - Make sure to save series matrix as 'GSE146639_series_matrix.xlsx'.
-2. https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE174367:
-   Download the GSE174367_bulkRNA_processed.rda.gz file and (optionally) the Series Matrix file (a preprocessed metadata version is available within the repository)
+2.  https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE174367:
+   Download the GSE174367_bulkRNA_processed.rda.gz file and (optionally) the Series Matrix file (a preprocessed metadata version is available within the repository).
     - Make sure series matrix is named 'GSE174367_bulkRNA_processed.rda.gz'
     - Make sure to save series matrix as 'GSE174367_series_matrix.xlsx'
 - After downloading the data, create a folder named 'data' in the root of the repository, and place everything in the folder. Use the folder path in the scripts wherever there's a placeholder path.
