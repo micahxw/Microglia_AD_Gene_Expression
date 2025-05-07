@@ -1,15 +1,18 @@
+#metadata prep.R
 #This file prepares the metadata for GSE146639 (microglia) and GSE174367 (brain) for use in project.
 #Resulting files are also uploaded to the GitHub
+
 library(tidyverse)
 library(readxl)
 library(writexl)
-library(dplyr)
-library(tidyr)
 
-
+#replace with your base path here
+base_path <- "path/to/project/folder"
 #GSE146639 metadata
-# extract metadata info from provided series matrix -> REPLACE PATH
-GSE146639_matrix <- read_excel("C:/Users/milla/OneDrive/Desktop/194b/GSE146639_series_matrix.xlsx", col_names = FALSE, skip=32)
+GSE146639_matrix <- read_excel(
+  file.path(base_path, "GSE146639_series_matrix.xlsx"), 
+  col_names = FALSE, skip=32)
+
 #format and transpose matrix
 colnames(GSE146639_matrix) <- GSE146639_matrix[[1]]
 GSE146639_transposed<- t(GSE146639_matrix)
@@ -41,18 +44,22 @@ GSE146639_metadata <- GSE146639_transposed %>%
   filter(grepl("bulk", bulk_single, ignore.case = TRUE))
 
 rownames(GSE146639_metadata) <- NULL
-#save metadata, REPLACE PATH
-write_xlsx(GSE146639_metadata, "/Users/milla/OneDrive/Desktop/194b/GSE146639_metadata.xlsx")
+#save metadata
+write_xlsx(GSE146639_metadata, file.path(base_path, "GSE146639_metadata.xlsx"))
 
 #GSE174367 metadata
 # extract metadata info from provided series matrix -> REPLACE PATH
-GSE174367_matrix <- read_excel("C:/Users/milla/OneDrive/Desktop/194b/GSE174367_series_matrix.xlsx", col_names = FALSE, skip=34)
+GSE174367_matrix <- read_excel(
+  file.path(base_path, "GSE174367_series_matrix.xlsx"),
+  col_names = FALSE, skip = 34)
+
 #format and transpose matrix
 GSE174367_transposed<- as.data.frame(t(GSE174367_matrix))
 colnames(GSE174367_transposed) <- GSE174367_matrix[[1]]
 GSE174367_transposed <- GSE174367_transposed[-1, ] 
 colnames(GSE174367_transposed) <- make.names(colnames(GSE174367_transposed), unique = TRUE)
 
+#select and format relevant columns
 GSE174367_metadata <- GSE174367_transposed %>% 
   select(
     `X.Sample_title`,
@@ -75,6 +82,5 @@ GSE174367_metadata <- GSE174367_transposed %>%
   filter(grepl("bulk", bulk_single, ignore.case = TRUE))
 
 rownames(GSE174367_metadata) <- NULL
-#save metadata, REPLACE PATH
-write_xlsx(GSE174367_metadata, "/Users/milla/OneDrive/Desktop/194b/GSE174367_metadata.xlsx")
-
+#save metadata
+write_xlsx(GSE174367_metadata, file.path(base_path, "GSE174367_metadata.xlsx"))
