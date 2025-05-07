@@ -1,3 +1,6 @@
+#DESeq2 analysis.R
+#This file takes in GSE146639_metadata and the path to the GSE146639 bulk 
+#RNA seq files, and performs DESeq2 analysis and GSEA
 library(DESeq2)
 library(readxl)
 library(clusterProfiler)
@@ -5,11 +8,11 @@ library(enrichplot)
 library(org.Hs.eg.db)
 library(ggplot2)
 
-#replace with your base path here
+#replace with your project path to set base path for project
 base_path <- "path/to/project/folder"
 metadata_path <- file.path(base_path, "GSE146639_metadata.xlsx")
 bulk_path <- file.path(base_path, "bulk")
-output_path <- base_path
+output_path <- base_path #change output path if needed
 
 #Load metadata
 GSE146639_metadata<- read_excel(metadata_path)
@@ -30,11 +33,6 @@ filtered_count_list <- lapply(count_list, function(x) x[common_genes, , drop = F
 #create expression df for differential expression analysis
 count_matrix <- do.call(cbind, filtered_count_list)
 colnames(count_matrix) <- GSE146639_metadata$Sample_id
-
-#Save GSE146639 expression matrix for downstream modeling
-write.csv(count_matrix, file.path(output_path, "146639_expr_data.csv"))
-
-#continue prepping count matrix and metadata for DESeq2
 count_matrix <- as.matrix(count_matrix)
 storage.mode(count_matrix) <- "numeric" 
 GSE146639_metadata <- GSE146639_metadata[match(colnames(count_matrix), GSE146639_metadata$Sample_id), ]
@@ -49,13 +47,13 @@ dds <- DESeqDataSetFromMatrix(
 dds <- DESeq(dds)
 res <- results(dds)
 
-#Select top DEGs for ML features
+#Select top 250 DEGs for ML features
 ranked_res <- res[order(res$pvalue), ]
 deg_features <- rownames(ranked_res)[1:250]
 write.csv(deg_features, file.path(output_path, "deg_features.csv"), row.names = FALSE)
 
-
-#Save variance-stabilized data for potential downstream analysis
+#Optionally, save variance-stabilized data for potential downstream analysis 
+#(not currently used in project, but may be useful for additional analyses)
 vsd <- vst(dds, blind = FALSE)
 norm_counts <- assay(vsd)
 write.csv(norm_counts, file.path(output_path, "norm_counts.csv"))
