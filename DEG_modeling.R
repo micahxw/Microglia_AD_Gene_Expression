@@ -65,7 +65,6 @@ for (n in deg_counts) {
         trControl = ctrl,
         tuneGrid = tune_grid
       )
-      
       best_acc <- max(trained_model$results$Accuracy)
       results <- add_row(results, NumGenes = n, Model = model, Accuracy = best_acc)
     }, error = function(e) {
@@ -75,7 +74,6 @@ for (n in deg_counts) {
 }
 
 print(results %>% arrange(desc(Accuracy)))
-
 
 #Want to focus on RF-> performed well overall, useful for feature importance
 #Baseline model: select top 150 DEGs
@@ -106,7 +104,6 @@ classifier_RF <- randomForest(
   importance = TRUE
 )
 
-
 #Evaluate RF
 y_pred_class <- predict(classifier_RF, newdata = test_rf[, -ncol(test_rf)])
 
@@ -127,7 +124,6 @@ cat("Accuracy :", round(accuracy_rf, 4), "\n")
 cat("Precision:", round(precision_rf, 4), "\n")
 cat("Recall   :", round(recall_rf, 4), "\n")
 cat("AUROC    :", round(auroc_rf, 4), "\n")
-
 
 #feature importance to get top 10 important genes
 importance_scores <- importance(classifier_RF)
