@@ -2,144 +2,134 @@
 #This file takes in GSE174367 expression data and DEG file from GSE146639
 #and applies ML models to classify AD vs. CTR
 
-library(caret)
-library(randomForest)
-library(e1071)
+library(readxl)
 library(readr)
+library(dplyr)
+library(caret)
 library(pROC)
+library(org.Hs.eg.db)
 library(ggplot2)
 
 #Replace with your project path to set base path for project
-base_path <- "C:/Users/milla/OneDrive/Desktop/194b"
+base_path <- "path/to/project/folder"
 setwd(base_path)
 
 #Load normalized GSE174367 expression data from GEO download
 load("GSE174367_bulkRNA_processed.rda")
 GSE174367_expr <- normExpr.reg
 
-#Read in top 250 DEGs from GSE146639 microglial expression data
+#Load metadata
+GSE174367_metadata <- read_excel(file.path(base_path, "GSE174367_metadata.xlsx"))
+
+#Read in top DEGs from GSE146639 microglial expression data
 deg_features <- read_csv(file.path(base_path, "deg_features.csv"))
 
-#Read in GSE174367 metadata and create AD/CTR labels
-GSE174367_metadata <- read_excel(file.path(base_path, "GSE174367_metadata.xlsx"))
-GSE174367_labels <- GSE174367_metadata$donor_group
 
-#for reproducibility:
-set.seed(42)
-
-#Exploratory only- to inform later model decision
-#Loop through different numbers of DEGS, classification model types
-#choose counts and models to test:
-deg_counts <- c(50, 100, 150, 200, 250)
-models_to_test <- c("rf", "svmRadial", "glm")
-results <- data.frame(NumGenes = integer(),
-                      Model = character(),
-                      Accuracy = numeric(),
-                      stringsAsFactors = FALSE)
-for (n in deg_counts) {
-  # Subset top N DEGs
-  top_n_genes <- deg_features$x[1:n]
-  common_genes <- intersect(rownames(GSE174367_expr), top_n_genes)
-  expr_subset <- GSE174367_expr[common_genes, , drop = FALSE]
-  training_data <- as.data.frame(t(expr_subset))
-  rownames(training_data) <- colnames(expr_subset)
-  
-  labels <- GSE174367_metadata$donor_group[match(rownames(training_data), GSE174367_metadata$Sample_id)]
-  
-  for (model in models_to_test) {
-    if (model == "rf") {
-      tune_grid <- expand.grid(mtry = c(2, 5, 10))
-    } else if (model == "svmRadial") {
-      tune_grid <- expand.grid(sigma = 0.01, C = c(0.25, 0.5, 1))
-    } else {
-      tune_grid <- NULL  
-    }
-    
-    ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = multiClassSummary)
-    
-    tryCatch({
-      trained_model <- train(
-        x = training_data,
-        y = as.factor(labels),
-        method = model,
-        trControl = ctrl,
-        tuneGrid = tune_grid
-      )
-      best_acc <- max(trained_model$results$Accuracy)
-      results <- add_row(results, NumGenes = n, Model = model, Accuracy = best_acc)
-    }, error = function(e) {
-      message(sprintf("Model '%s' with %d genes failed: %s", model, n, e$message))
-    })
-  }
-}
-
-print(results %>% arrange(desc(Accuracy)))
-
-#Want to focus on RF-> performed well overall, useful for feature importance
-#Baseline model: select top 150 DEGs
-top_150_genes <- deg_features$x[1:150]
-common_genes <- intersect(rownames(GSE174367_expr), top_150_genes)
+#use top 60 DEGS, subset GSE174367 to these genes
+top_genes <- deg_features$x[1:60]
+common_genes <- intersect(rownames(GSE174367_expr), top_genes)
 expr_subset <- GSE174367_expr[common_genes, , drop = FALSE]
 
-# Transpose: samples x genes
-data_rf <- as.data.frame(t(expr_subset))
-rownames(data_rf) <- colnames(expr_subset)
+#prep training data and labels
+training_data <- as.data.frame(t(expr_subset))
+rownames(training_data) <- colnames(expr_subset)
+labels <- GSE174367_metadata$donor_group[match(rownames(training_data), GSE174367_metadata$Sample_id)]
+labels <- factor(labels, levels = c("CTR", "AD"))
 
-# Add labels (AD vs CTR)
-labels_rf <- GSE174367_metadata$donor_group[match(rownames(data_rf), GSE174367_metadata$Sample_id)]
-data_rf$Group <- as.factor(labels_rf)
+#evaluation function for repeated model metrics
+evaluate_model <- function(pred, prob, actual){
+  actual <- factor(actual, levels = c("CTR", "AD"))
+  pred <- factor(pred, levels = c("CTR", "AD"))
+  
+  cm <- confusionMatrix(pred, actual, positive="AD")
+  auc <- roc(actual, prob, levels = c("CTR", "AD"))$auc
+  data.frame(
+    Accuracy = cm$overall["Accuracy"],
+    Precision = cm$byClass["Precision"],
+    Recall = cm$byClass["Recall"],
+    F1 = cm$byClass["F1"],
+    AUROC = auc
+  )
+}
+set.seed(123)
 
-#test train split
-set.seed(42)
-split_rf <- sample.split(data_rf$Group, SplitRatio = 0.7)
-train_rf <- subset(data_rf, split_rf == TRUE)
-test_rf <- subset(data_rf, split_rf == FALSE)
+# set up 5-fold CV with 3 repeats
+cv <- trainControl(method='repeatedcv', number=5, classProbs=TRUE, repeats=3,
+                   summaryFunction = twoClassSummary,savePredictions = "final")
 
-#train RF
-set.seed(120)
-classifier_RF <- randomForest(
-  x = train_rf[, -ncol(train_rf)],  
-  y = train_rf$Group,
-  ntree = 500,
-  importance = TRUE
-)
-
-#Evaluate RF
-y_pred_class <- predict(classifier_RF, newdata = test_rf[, -ncol(test_rf)])
-
-# Create confusion matrix
-conf_mat <- confusionMatrix(y_pred_class, test_rf$Group)
-accuracy_rf <- conf_mat$overall["Accuracy"]
-precision_rf <- conf_mat$byClass["Precision"]
-recall_rf <- conf_mat$byClass["Recall"]
-
-# Predict probabilities
-y_prob <- predict(classifier_RF, newdata = test_rf[, -ncol(test_rf)], type = "prob")[, 2]
-
-# ROC and AUC
-roc_obj <- roc(response = test_rf$Group, predictor = y_prob, levels = rev(levels(test_rf$Group)))
-auroc_rf <- auc(roc_obj)
-
-cat("Accuracy :", round(accuracy_rf, 4), "\n")
-cat("Precision:", round(precision_rf, 4), "\n")
-cat("Recall   :", round(recall_rf, 4), "\n")
-cat("AUROC    :", round(auroc_rf, 4), "\n")
-
-#feature importance to get top 10 important genes
-importance_scores <- importance(classifier_RF)
-importance_df <- data.frame(Gene = rownames(importance_scores), Importance = importance_scores[, 1])
-importance_df <- importance_df[order(-importance_df$Importance), ]
-print(head(importance_df, 10))
+#RF(baseline) model
+rf_model<- train(x = training_data, y=labels,
+                 method="rf", 
+                 metric="ROC", 
+                 trControl=cv)
 
 
-# Plot the top 10 important genes using ggplot2
-library(ggplot2)
-ggplot(top_10_importance, aes(x = reorder(Gene, Importance), y = Importance)) +
-  geom_point(color = "steelblue", size = 4) +  
-  coord_flip() +  
-  labs(title = "Top 10 Important Genes (RF)", x = "Gene", y = "Importance") +
-  theme_minimal()
+rf_pred <- rf_model$pred
+rf_pred_labels <- factor(ifelse(rf_pred$AD >= 0.5, "AD", "CTR"), levels = c("CTR", "AD"))
+rf_metrics <- evaluate_model(rf_pred_labels, rf_pred$AD, rf_pred$obs)
+print(rf_metrics)
 
-#Plot ROC curve
-plot(roc_obj, main = "ROC Curve - Final RF Model", col = "blue", lwd = 2)
-abline(a = 0, b = 1, lty = 2, col = "gray")
+
+#XGBOOST (baseline) model
+xgb_model <- train(x = training_data, y = labels, 
+  method = "xgbTree", 
+  metric = "ROC", 
+  trControl = cv)
+
+
+xgb_preds <- xgb_model$pred
+xgb_pred_labels <- factor(ifelse(xgb_preds$AD >= 0.5, "AD", "CTR"), levels = c("CTR", "AD"))
+xgb_metrics <- evaluate_model(xgb_pred_labels, xgb_preds$AD, xgb_preds$obs)
+print(xgb_metrics)
+
+
+#LASSO- tuning + feature importance
+tune_grid <- expand.grid(alpha = 1,lambda = 10^seq(-4, 1, length = 20))
+
+lasso_model <- train(x = training_data, y = labels,
+                      method = "glmnet",
+                      metric = "ROC",
+                      trControl = cv,
+                      tuneGrid = tune_grid,
+                     preProcess = c("center", "scale"))
+
+
+best_lambda <- lasso_model$bestTune$lambda
+lasso_preds <- lasso_model$pred %>% filter(lambda == best_lambda)
+roc_obj <- roc(lasso_preds$obs, lasso_preds$AD, levels = c("CTR", "AD"))
+
+#find best threshold for LASSO metrics
+best_threshold <- as.numeric(coords(roc_obj, "best", ret = "threshold"))
+print(best_threshold)
+lasso_pred_labels <- factor(ifelse(lasso_preds$AD >= best_threshold, "AD", "CTR"), levels = c("CTR", "AD"))
+lasso_metrics <- evaluate_model(lasso_pred_labels, lasso_preds$AD, lasso_preds$obs)
+print(lasso_metrics)
+
+# Feature Importance from LASSO
+# Extract coefficients for best lambda, arrange from best to worst
+coef_best <- coef(lasso_model$finalModel, s = best_lambda)
+feature_importance <- data.frame(
+  Gene = rownames(coef_best),
+  Coefficient = as.vector(coef_best))%>% 
+  filter(Gene != "(Intercept)")%>%
+  arrange(desc(abs(Coefficient)))
+
+
+# Get top 10 features by absolute coefficient
+top_features <- feature_importance %>%
+  slice_max(order_by = abs(Coefficient), n = 10)
+
+#convert features from ENSEMBL ID to gene names for visualization
+map_gene_names <- mapIds(org.Hs.eg.db, keys=top_features$Gene, column='SYMBOL',
+                         keytype = "ENSEMBL")
+top_features$gene_names <- map_gene_names
+
+# Plot in dot plot style
+ggplot(top_features, aes(x = reorder(gene_names, abs(Coefficient)), y = Coefficient)) +
+  geom_point(aes(color = Coefficient > 0), size = 4) +
+  scale_color_manual(values = c("steelblue", "firebrick"), guide = "none") +
+  coord_flip() +
+  labs(title = "Top 10 Important Genes in AD vs. CTR Classification",
+       x = "Gene",
+       y = "Lasso Coefficient") 
+
