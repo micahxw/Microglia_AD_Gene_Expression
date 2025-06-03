@@ -8,6 +8,7 @@ library(writexl)
 
 #replace with your base path here
 base_path <- "path/to/project/folder"
+
 #GSE146639 metadata
 GSE146639_matrix <- read_excel(
   file.path(base_path, "GSE146639_series_matrix.xlsx"), 
@@ -29,6 +30,7 @@ GSE146639_metadata <- GSE146639_transposed %>%
     `X.Sample_characteristics_ch1.1`,
     `X.Sample_characteristics_ch1.2`,
     `X.Sample_characteristics_ch1.4`,
+    `X.Sample_characteristics_ch1.5`,
     `X.Sample_characteristics_ch1.6`,
     `X.Sample_characteristics_ch1.7`) %>%
   rename(
@@ -38,7 +40,8 @@ GSE146639_metadata <- GSE146639_transposed %>%
     brain_region = `X.Sample_characteristics_ch1.4`,
     age = `X.Sample_characteristics_ch1.6`,
     gender = `X.Sample_characteristics_ch1.7`,
-    bulk_single = `X.Sample_title`)%>%
+    bulk_single = `X.Sample_title`,
+    seq_pool = `X.Sample_characteristics_ch1.5`)%>%
   mutate(across(everything(), ~ gsub("^[^:]+: ", "", .)),
          donor_group = if_else(donor_group == "CTR+", "CTR", donor_group))%>%
   filter(grepl("bulk", bulk_single, ignore.case = TRUE))
@@ -48,7 +51,6 @@ rownames(GSE146639_metadata) <- NULL
 write_xlsx(GSE146639_metadata, file.path(base_path, "GSE146639_metadata.xlsx"))
 
 #GSE174367 metadata
-# extract metadata info from provided series matrix -> REPLACE PATH
 GSE174367_matrix <- read_excel(
   file.path(base_path, "GSE174367_series_matrix.xlsx"),
   col_names = FALSE, skip = 34)
