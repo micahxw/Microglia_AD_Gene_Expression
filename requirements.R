@@ -1,7 +1,8 @@
 #This file installs all necessary packages
+
 # Install BiocManager if not already installed
 if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
+  install.packages("BiocManager")
 
 # Install Bioconductor packages
 BiocManager::install(c("DESeq2", "clusterProfiler", "org.Hs.eg.db", "enrichplot"))
@@ -11,10 +12,11 @@ install.packages(c(
   "tidyverse",
   "readxl",
   "writexl",
+  "readxl",
   "ggplot2",
   "caret",
   "randomForest",
   "e1071",
-  "readr",
-  "pROC"
+  "pROC",
+  "MLmetrics"
 ))
