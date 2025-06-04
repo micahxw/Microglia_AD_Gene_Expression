@@ -122,7 +122,7 @@ top_features <- feature_importance %>%
 #convert features from ENSEMBL ID to gene names for visualization
 map_gene_names <- mapIds(org.Hs.eg.db, keys=top_features$Gene, column='SYMBOL',
                          keytype = "ENSEMBL")
-top_features$gene_names <- map_gene_names
+top_features$gene_names <- as.character(map_gene_names[top_features$Gene])
 
 # Plot in dot plot style
 ggplot(top_features, aes(x = reorder(gene_names, abs(Coefficient)), y = Coefficient)) +
